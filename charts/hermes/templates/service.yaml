@@ -1,0 +1,23 @@
+# Two named ports, one Service:
+#   dashboard (9119)  the admin panel + embedded chat; what an Ingress publishes.
+#   api       (8642)  the OpenAI-compatible API, bearer-token guarded (API_SERVER_KEY).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hermes.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "hermes.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: dashboard
+      port: {{ .Values.service.dashboardPort }}
+      targetPort: dashboard
+      protocol: TCP
+    - name: api
+      port: {{ .Values.service.apiPort }}
+      targetPort: api
+      protocol: TCP

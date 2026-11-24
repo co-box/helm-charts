@@ -1,0 +1,22 @@
+# Hermes Agent — a single-instance, stateful agent with its own $HERMES_HOME.
+#
+# The chart owns:
+#   PVC          $HERMES_HOME (/opt/data): config.yaml, .env, state.db, skills, memories,
+#                workspace. It IS the agent's memory.
+#   ConfigMap    optional first-boot config.yaml, seeded by the `seed-config` init container
+#                and never overwritten afterwards, so `hermes config set` survives.
+#   Deployment   `gateway run` under the image's own s6 supervision, strategy Recreate.
+#   Service      dashboard 9119 (publishable) and API 8642 (cluster-internal).
+#   Ingress      optional dashboard route.
+#   ESO objects  optional generated credentials (API bearer token, dashboard password).
+#
+# The image's ENTRYPOINT must stay in place: it starts s6, whose stage-2 hook remaps the user
+# and fixes ownership of the volume. Replacing it runs as root forever and skips that.
+apiVersion: v2
+name: hermes
+description: >-
+  Hermes Agent with a persistent home, dashboard/API services, optional ingress and
+  External Secrets generated credentials.
+type: application
+version: 0.1.0
+appVersion: "0.23.4"

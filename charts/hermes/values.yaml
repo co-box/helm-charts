@@ -1,0 +1,116 @@
+# Default values for the generic Hermes Agent chart.
+
+image:
+  repository: docker.io/nousresearch/hermes-agent
+  # Defaults to Chart.appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# `gateway run` in Compose is `args` here; the image's ENTRYPOINT must stay in place because it
+# is what starts s6 and the stage-2 hook that remaps the user and fixes volume ownership.
+command:
+  - gateway
+  - run
+
+# The uid/gid the image demotes itself to at boot. Do NOT set a Kubernetes runAsUser: the image
+# aborts on an arbitrary --user and needs root for the boot remap.
+hermes:
+  uid: 1000
+  gid: 1000
+
+timezone: Etc/UTC
+
+# Secret read via envFrom, holding the agent's environment (API_SERVER_KEY, dashboard password,
+# model provider key, ...). When credentials.generate is true this chart creates it with ESO;
+# otherwise create it out of band. Empty means the Deployment reads no Secret.
+existingSecret: ""
+
+credentials:
+  # Render External Secrets `Password` generators plus an ExternalSecret named existingSecret.
+  # Requires the External Secrets Operator in the cluster. Values are generated once — the
+  # ExternalSecret uses refreshPolicy OnChange, so a periodic refresh does not rotate them.
+  generate: false
+  # Sync-wave for the generated objects; negative so the Secret exists before the Deployment.
+  syncWave: "-1"
+  # Dashboard login name. Not a credential. Empty leaves HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+  # unset, for secrets that already provide it.
+  dashboardUsername: ""
+  # 32 random bytes as hex: no shell-hostile characters, fixed length.
+  apiServerKey:
+    length: 64
+  # Typeable alphanumerics, safe to paste into a shell or a URL.
+  dashboardPassword:
+    length: 28
+
+# Extra environment variables / sources, volumes / mounts, rendered verbatim on the Hermes
+# container or pod.
+extraEnv: []
+extraEnvFrom: []
+extraVolumes: []
+extraVolumeMounts: []
+
+persistence:
+  enabled: true
+  size: 5Gi
+  # Empty uses the cluster's default StorageClass. Use a node-local class for SQLite's WAL.
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  annotations:
+    # Prune must not be able to throw away state.db — remove the claim explicitly when that is
+    # the intent. This is not a backup.
+    helm.sh/resource-policy: keep
+
+service:
+  type: ClusterIP
+  dashboardPort: 9119
+  apiPort: 8642
+
+ingress:
+  enabled: false
+  className: ""
+  # Required when enabled.
+  host: ""
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls:
+    # Render a TLS block for the host. Set secretName to terminate here; leave it empty when a
+    # TLS-terminating proxy or gateway in front of the cluster serves the certificate.
+    enabled: true
+    secretName: ""
+
+# The initial $HERMES_HOME/config.yaml. Settings only — never secrets. Empty disables the
+# ConfigMap and the seed-config init container (for instances configured entirely in the UI or
+# in an existing volume).
+config: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 2Gi
+
+# /dev/shm for Chromium (the browser tool). The Kubernetes default of 64Mi is too small.
+shmSizeLimit: 512Mi
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+nodeSelector:
+  kubernetes.io/os: linux
+terminationGracePeriodSeconds: 30
+tolerations: []
+affinity: {}
+
+# Override the release-derived resource names. Setting fullnameOverride keeps resource names
+# stable when an existing release is migrated to this chart.
+nameOverride: ""
+fullnameOverride: ""
+
+# Label added as app.kubernetes.io/part-of when set.
+partOf: ""

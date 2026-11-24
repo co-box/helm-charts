@@ -1,0 +1,185 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hermes.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # One instance owns $HERMES_HOME (SQLite + WAL). A rolling update would ask for the same
+  # ReadWriteOnce volume while the old pod still holds it, and on a single-node cluster there
+  # is nowhere to place the new pod: the rollout would sit at Pending forever. Recreate stops
+  # the old pod first.
+  strategy:
+    type: Recreate
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "hermes.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hermes.selectorLabels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.config }}
+        # Forces a roll when the fallback config changes shape. The init container refuses to
+        # overwrite an existing config.yaml, so this is not a switch for config edits.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "hermes.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: hermes
+          image: {{ include "hermes.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # No `command:` — the image's ENTRYPOINT dispatcher stays in place: it starts s6, whose
+          # stage-2 hook remaps the hermes user to HERMES_UID/GID, creates the home subdirectories
+          # and fixes ownership of the volume. Replacing it runs as root forever and skips that.
+          args:
+            {{- toYaml .Values.command | nindent 12 }}
+          ports:
+            - name: dashboard
+              containerPort: {{ .Values.service.dashboardPort }}
+              protocol: TCP
+            - name: api
+              containerPort: {{ .Values.service.apiPort }}
+              protocol: TCP
+          env:
+            - name: HERMES_HOME
+              value: /opt/data
+            - name: HERMES_UID
+              value: {{ .Values.hermes.uid | quote }}
+            - name: HERMES_GID
+              value: {{ .Values.hermes.gid | quote }}
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+            # The API server is on and bound to the pod network so another workload in the
+            # cluster can drive this instance; its bearer token comes from existingSecret.
+            - name: API_SERVER_ENABLED
+              value: "true"
+            - name: API_SERVER_HOST
+              value: 0.0.0.0
+            # The dashboard is the only publishable surface. Its basic-auth gate reads the
+            # password from existingSecret; the username is not a credential.
+            - name: HERMES_DASHBOARD
+              value: "1"
+            - name: HERMES_DASHBOARD_HOST
+              value: 0.0.0.0
+            {{- with .Values.credentials.dashboardUsername }}
+            - name: HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if or .Values.existingSecret .Values.extraEnvFrom }}
+          # Required, not optional: a missing Secret must fail loudly at pod start rather than
+          # boot an agent with no API token or no provider key.
+          envFrom:
+            {{- with .Values.existingSecret }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          # /health is the API server's own endpoint. The startup window is generous: first boot
+          # seeds the config and syncs skills before the API server listens.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: api
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: api
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: api
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: shm
+              mountPath: /dev/shm
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "hermes.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.shmSizeLimit }}
+        {{- if .Values.config }}
+        - name: config
+          configMap:
+            name: {{ include "hermes.fullname" . }}-config
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if .Values.config }}
+      initContainers:
+        # First-boot config only: copies the ConfigMap in when the volume has none, then hands
+        # it to the agent's uid so `hermes config set` in the running pod can rewrite it.
+        - name: seed-config
+          image: busybox:1.37
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              if [ ! -s /opt/data/config.yaml ]; then
+                cp /seed/config.yaml /opt/data/config.yaml
+                echo "seed-config: wrote /opt/data/config.yaml from the ConfigMap"
+              else
+                echo "seed-config: /opt/data/config.yaml exists, left untouched"
+              fi
+              chown {{ .Values.hermes.uid }}:{{ .Values.hermes.gid }} /opt/data/config.yaml || true
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: config
+              mountPath: /seed
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            runAsUser: 0
+      {{- end }}
