@@ -8,6 +8,7 @@ image:
   # MUST match the running GlitchTip image (apps/templates/apps/glitchtip.yaml) so the
   # ORM models the script imports line up with the migrated schema.
   repository: glitchtip/glitchtip
+  # Kept in lockstep with Chart.yaml version/appVersion by Renovate.
   tag: "6.2.0"
   pullPolicy: IfNotPresent
 

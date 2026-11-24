@@ -1,0 +1,43 @@
+name: Renovate
+
+on:
+  schedule:
+    # Check for new Hermes and GlitchTip releases once a day.
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    name: Check for new chart versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a Renovate token
+        env:
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+        run: |
+          if [ -z "${RENOVATE_TOKEN}" ]; then
+            echo "::error::Missing repository secret RENOVATE_TOKEN."
+            echo "Create a fine-grained PAT with Contents, Pull requests, Issues and Metadata access"
+            echo "on this repository, then add it as the RENOVATE_TOKEN Actions secret."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Renovate
+        uses: renovatebot/github-action@v46.3.15
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          LOG_LEVEL: info

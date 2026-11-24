@@ -1,0 +1,62 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Hermes: Chart.yaml version and appVersion track the upstream image tag",
+      "managerFilePatterns": ["/^charts\\/hermes\\/Chart\\.yaml$/"],
+      "matchStrings": [
+        "version:\\s*[^\\n]+\\nappVersion:\\s*[\"'](?<currentValue>[^\"']+)[\"']"
+      ],
+      "autoReplaceStringTemplate": "version: {{{replace \"^v\" \"\" newValue}}}\nappVersion: \"{{{newValue}}}\"",
+      "depNameTemplate": "docker.io/nousresearch/hermes-agent",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "GlitchTip: image tag in the chart defaults",
+      "managerFilePatterns": ["/^charts\\/glitchtip-bootstrap\\/values\\.yaml$/"],
+      "matchStrings": ["tag:\\s*[\"'](?<currentValue>\\d+\\.\\d+\\.\\d+)[\"']"],
+      "depNameTemplate": "docker.io/glitchtip/glitchtip",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "GlitchTip: Chart.yaml version and appVersion track the image tag",
+      "managerFilePatterns": ["/^charts\\/glitchtip-bootstrap\\/Chart\\.yaml$/"],
+      "matchStrings": [
+        "version:\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)\\nappVersion:\\s*[\"']\\d+\\.\\d+\\.\\d+[\"']"
+      ],
+      "autoReplaceStringTemplate": "version: {{{newValue}}}\nappVersion: \"{{{newValue}}}\"",
+      "depNameTemplate": "docker.io/glitchtip/glitchtip",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["/^(?:docker\\.io/)?nousresearch\\/hermes-agent$/"],
+      "allowedVersions": "/^v0\\.\\d+\\.\\d+$/",
+      "extractVersion": "^v(?<version>0\\.\\d+\\.\\d+)$",
+      "groupName": "hermes",
+      "groupSlug": "hermes",
+      "labels": ["hermes"],
+      "commitMessagePrefix": "hermes:"
+    },
+    {
+      "matchPackageNames": ["/^(?:docker\\.io/)?glitchtip\\/glitchtip$/"],
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/",
+      "extractVersion": "^(?<version>\\d+\\.\\d+\\.\\d+)$",
+      "groupName": "glitchtip",
+      "groupSlug": "glitchtip",
+      "labels": ["glitchtip"],
+      "commitMessagePrefix": "glitchtip:"
+    }
+  ],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10
+}

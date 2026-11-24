@@ -20,6 +20,6 @@ description: >-
 type: application
 # Chart version, appVersion and the default image tag track the Hermes release in lockstep.
 # `version` is the semver form (no `v`); `appVersion` is the exact upstream image tag, which is
-# also what an empty `image.tag` resolves to.
+# also what an empty `image.tag` resolves to. Renovate updates both lines together.
 version: 0.23.4
 appVersion: "v0.23.4"
