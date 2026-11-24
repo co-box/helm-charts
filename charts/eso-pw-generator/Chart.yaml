@@ -1,0 +1,19 @@
+# eso-pw-generator — reusable External Secrets `Password` generator chart.
+#
+# Renders, for every entry in `secrets`:
+#   * one ESO `Password` generator per key, so each key can have its own length/encoding, and
+#   * one `ExternalSecret` named after the target Secret, with exactly those key names.
+#
+# Nothing here commits a secret: the values are produced in-cluster by the External Secrets
+# Operator and written to a Secret in the release namespace.
+#
+# Rotation safety is the point of the defaults in values.yaml: the generated Secret is immutable
+# and orphaned, so an Argo CD sync — including one that prunes and re-creates the ExternalSecret —
+# never rewrites an existing value. Rotate deliberately by deleting the Secret and the
+# ExternalSecret (see README.md).
+apiVersion: v2
+name: eso-pw-generator
+description: Generate Secrets from External Secrets Operator Password generators, once and frozen
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

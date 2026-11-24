@@ -1,0 +1,59 @@
+# Values for eso-pw-generator.
+#
+# Each entry in `secrets` becomes one `ExternalSecret` plus one `Password` generator per key:
+#
+#   secrets:
+#     - name: my-secret            # Secret name (and ExternalSecret name); same namespace as release
+#       keys:
+#         - name: password
+#           length: 32
+#           encoding: raw          # raw | base64 | base64url | base32 | hex
+#           digits: 4
+#           symbols: 0
+#           allowRepeat: true
+#
+# Per-secret overrides: refreshPolicy, creationPolicy, immutable, annotations.
+# Per-key generation options: length, encoding, digits, symbols, symbolCharacters, noUpper,
+# allowRepeat, prefix, suffix. Anything omitted falls back to `defaults` below.
+secrets: []
+
+defaults:
+  length: 32
+  encoding: raw
+  # Alphanumerics by default: generator defaults would put symbols in 25% of the characters, which
+  # is fine for machine-to-machine tokens but painful for a password somebody has to type.
+  digits: 4
+  symbols: 0
+  # Required as soon as a password is longer than the alphabet without symbols (length > 62 for
+  # alphanumeric, > 52 for letters-only). Harmless otherwise.
+  allowRepeat: true
+  noUpper: false
+
+# Lifecycle of the generated Secrets. Keep all three as they are unless you know why you are
+# changing them:
+#
+#   immutable: true       ESO refuses to rewrite the data of an existing Secret. This is what makes
+#                         a re-sync, a pruned + re-applied ExternalSecret, or a changed generator
+#                         spec harmless. Kubernetes enforces it as well.
+#   creationPolicy: Orphan
+#                         Deleting the ExternalSecret keeps the Secret. With Owner, Kubernetes GC
+#                         would delete the Secret together with the ExternalSecret, and the next
+#                         sync would generate a different value.
+#   refreshPolicy: OnChange
+#                         No periodic refresh (so the generators are not run on a schedule), but a
+#                         spec/metadata change is reconciled. That also lets ESO adopt Secrets that
+#                         already exist when this chart takes over, dropping stale owner references
+#                         and marking them immutable without touching the data. `CreatedOnce` is
+#                         the stricter alternative; `Periodic` would still not rotate as long as
+#                         `immutable` is true, but it needlessly runs the generators.
+refreshPolicy: OnChange
+creationPolicy: Orphan
+immutable: true
+
+# Applied to every rendered object. Useful for ownership labels in a shared namespace.
+commonLabels: {}
+commonAnnotations: {}
+
+# Prefix for generator object names. Defaults to the Helm release name; it only has to be unique
+# within the namespace (the Secret name is appended to it).
+fullnameOverride: ""
