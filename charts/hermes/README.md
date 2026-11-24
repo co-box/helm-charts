@@ -19,7 +19,7 @@ The chart renders:
 ## Usage
 
 ```bash
-helm install hermes oci://ghcr.io/co-box/helm-charts/hermes --version 0.1.0 \
+helm install hermes oci://ghcr.io/co-box/helm-charts/hermes --version 0.23.4 \
   --namespace hermes --create-namespace \
   --set existingSecret=hermes-env \
   --set ingress.enabled=true \
@@ -29,6 +29,9 @@ helm install hermes oci://ghcr.io/co-box/helm-charts/hermes --version 0.1.0 \
 `existingSecret` must contain the agent's environment (`API_SERVER_KEY`, the dashboard basic-auth
 password, and any model provider key). With `credentials.generate=true` the chart creates it
 instead, using External Secrets `Password` generators — see below.
+
+The chart version, `appVersion` and the default image tag track the Hermes release together
+(currently `0.23.4` / `v0.23.4` / `v0.23.4`).
 
 ### Config
 

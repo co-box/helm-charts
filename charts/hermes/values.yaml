@@ -2,7 +2,8 @@
 
 image:
   repository: docker.io/nousresearch/hermes-agent
-  # Defaults to Chart.appVersion when empty.
+  # Empty means Chart.appVersion, which is the exact upstream image tag (`v0.23.4`). Set this only
+  # to run a build other than the one the chart version targets; the two are kept in lockstep.
   tag: ""
   pullPolicy: IfNotPresent
 
