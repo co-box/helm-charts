@@ -9,7 +9,7 @@ image:
   # ORM models the script imports line up with the migrated schema.
   repository: glitchtip/glitchtip
   # Kept in lockstep with Chart.yaml version/appVersion by Renovate.
-  tag: "6.2.0"
+  tag: "7.0.0"
   pullPolicy: IfNotPresent
 
 # Django settings module of the GlitchTip backend (used by `manage.py shell`).

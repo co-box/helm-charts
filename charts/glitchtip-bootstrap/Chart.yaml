@@ -15,5 +15,5 @@ type: application
 # Chart version and appVersion track the GlitchTip image tag in values.yaml. Renovate
 # updates values.yaml, version and appVersion together; merging the PR publishes the
 # new chart version.
-version: 6.2.0
-appVersion: "6.2.0"
+version: 7.0.0
+appVersion: "7.0.0"
